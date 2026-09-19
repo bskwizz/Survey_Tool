@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Live Classroom Survey - Instructor Dashboard</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="layout">
+    <header class="topbar">
+      <h1>Live Classroom Survey <span class="badge">Instructor</span></h1>
+      <div id="authStatus" class="auth-status"></div>
+    </header>
+
+    <!-- ---------- Auth panel ---------- -->
+    <section id="authPanel" class="panel">
+      <h2>Sign in</h2>
+      <form id="loginForm" class="inline-form">
+        <input type="email" id="loginEmail" placeholder="Email" required />
+        <input type="password" id="loginPassword" placeholder="Password" required />
+        <button type="submit" class="btn primary">Sign in</button>
+      </form>
+      <p class="hint">No account? <button id="showRegister" class="link-btn">Register</button></p>
+      <form id="registerForm" class="inline-form hidden">
+        <input type="email" id="registerEmail" placeholder="Email" required />
+        <input type="password" id="registerPassword" placeholder="Password (min 8 chars)" required />
+        <button type="submit" class="btn primary">Create account</button>
+      </form>
+      <p id="authError" class="error-text"></p>
+    </section>
+
+    <!-- ---------- Main dashboard (hidden until authenticated) ---------- -->
+    <main id="mainPanel" class="hidden">
+      <section class="panel">
+        <h2>Presentation</h2>
+        <div class="inline-form">
+          <select id="presentationSelect"></select>
+          <input type="text" id="newPresentationTitle" placeholder="New presentation title" />
+          <button id="createPresentationBtn" class="btn secondary">Create</button>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Create Question</h2>
+        <div class="inline-form wrap">
+          <input type="text" id="slideRefInput" placeholder="Slide ref (e.g. slide-3)" />
+          <select id="questionTypeSelect">
+            <option value="multiple_choice">Multiple choice</option>
+            <option value="rating">Rating (1-5)</option>
+            <option value="open_text">Open text</option>
+          </select>
+          <input type="text" id="promptInput" placeholder="Question prompt" class="grow" />
+        </div>
+        <div id="optionsContainer" class="inline-form wrap"></div>
+        <button id="createQuestionBtn" class="btn primary">Add Question</button>
+      </section>
+
+      <section class="panel">
+        <h2>Questions</h2>
+        <div id="questionList" class="question-list"></div>
+      </section>
+
+      <section id="questionDetail" class="panel hidden">
+        <h2>Question Detail</h2>
+        <div id="detailContent"></div>
+      </section>
+    </main>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

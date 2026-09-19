@@ -1,0 +1,11 @@
+{
+  "name": "@classroom-survey/participant-app",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Mobile-first static participant web app (vanilla JS/HTML/CSS, no build step).",
+  "scripts": {
+    "dev": "npx --yes serve -l 5173 .",
+    "start": "npx --yes serve -l 5173 ."
+  },
+  "license": "MIT"
+}

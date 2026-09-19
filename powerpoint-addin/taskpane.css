@@ -1,0 +1,17 @@
+body { margin: 0; font-family: 'Segoe UI', -apple-system, sans-serif; color: #1f2937; }
+.pane { padding: 16px; }
+h1 { font-size: 1.1rem; margin-bottom: 4px; }
+h2 { font-size: 0.85rem; text-transform: uppercase; color: #6b7280; margin: 16px 0 8px; }
+.section { margin-bottom: 12px; }
+.hidden { display: none !important; }
+.hint { color: #6b7280; font-size: 0.8rem; }
+.error-text { color: #b91c1c; font-size: 0.8rem; }
+input, select {
+  display: block; width: 100%; margin-bottom: 8px; padding: 6px 8px;
+  border: 1px solid #e5e7eb; border-radius: 6px; font-size: 0.85rem;
+}
+label { font-size: 0.75rem; color: #6b7280; }
+.btn { border: none; border-radius: 6px; padding: 8px 12px; font-weight: 600; cursor: pointer; margin-right: 6px; margin-bottom: 8px; font-size: 0.85rem; }
+.btn.primary { background: #5b21b6; color: #fff; }
+.btn.secondary { background: #0891b2; color: #fff; }
+.btn-row { display: flex; flex-wrap: wrap; }

@@ -1,0 +1,14 @@
+node_modules/
+.env
+*.log
+dist/
+build/
+.DS_Store
+data/*.json
+!data/.gitkeep
+coverage/
+.vscode/
+*.pem
+*.key
+*.crt
+office-addin-dev-certs/

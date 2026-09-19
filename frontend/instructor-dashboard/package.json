@@ -1,0 +1,11 @@
+{
+  "name": "@classroom-survey/instructor-dashboard",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Instructor dashboard static web app (vanilla JS/HTML/CSS, no build step).",
+  "scripts": {
+    "dev": "npx --yes serve -l 5174 .",
+    "start": "npx --yes serve -l 5174 ."
+  },
+  "license": "MIT"
+}

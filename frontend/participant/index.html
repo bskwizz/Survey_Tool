@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+  <title>Live Classroom Survey</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main id="app" class="app">
+    <header class="app-header">
+      <h1>Live Classroom Survey</h1>
+      <p id="statusLine" class="status-line">Connecting…</p>
+    </header>
+
+    <section id="questionView" class="card hidden">
+      <p id="questionMeta" class="meta"></p>
+      <h2 id="questionPrompt" class="prompt"></h2>
+      <div id="answerArea"></div>
+      <button id="submitBtn" class="btn primary" disabled>Submit</button>
+    </section>
+
+    <section id="thankYouView" class="card hidden">
+      <h2>Thanks! 🎉</h2>
+      <p>Your response was submitted anonymously.</p>
+      <div id="liveAggregate" class="live-aggregate"></div>
+      <p class="hint">Keep this page open - the instructor may push a new question at any time.</p>
+    </section>
+
+    <section id="waitingView" class="card hidden">
+      <h2>Waiting for the next question…</h2>
+      <p class="hint">Stay on this page. No need to rescan the QR code.</p>
+    </section>
+
+    <section id="errorView" class="card hidden">
+      <h2>Something went wrong</h2>
+      <p id="errorMessage"></p>
+    </section>
+  </main>
+
+  <!-- Loaded from the backend's own Socket.IO server (served at /socket.io/socket.io.js) -->
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+  <title>Live Classroom Survey</title>
+  <!--
+    NOTE: In a real deployment, pin office.js to a specific released version
+    per Microsoft's guidance, and load it from the official CDN as shown.
+  -->
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js" type="text/javascript"></script>
+  <link rel="stylesheet" href="taskpane.css" />
+</head>
+<body>
+  <main id="app" class="pane">
+    <h1>Live Classroom Survey</h1>
+    <p id="statusLine" class="hint">Loading Office.js…</p>
+
+    <section id="authSection" class="section">
+      <h2>Instructor sign-in</h2>
+      <input type="email" id="emailInput" placeholder="Email" />
+      <input type="password" id="passwordInput" placeholder="Password" />
+      <button id="signInBtn" class="btn primary">Sign in</button>
+      <p id="authError" class="error-text"></p>
+    </section>
+
+    <section id="mainSection" class="section hidden">
+      <h2>This slide</h2>
+      <p id="slideIdLine" class="hint"></p>
+
+      <div id="noQuestionBlock">
+        <label>Presentation</label>
+        <select id="presentationSelect"></select>
+        <label>Question type</label>
+        <select id="typeSelect">
+          <option value="multiple_choice">Multiple choice</option>
+          <option value="rating">Rating (1-5)</option>
+          <option value="open_text">Open text</option>
+        </select>
+        <label>Prompt</label>
+        <input type="text" id="promptInput" placeholder="e.g. Which approach is clearest?" />
+        <div id="optionsBlock"></div>
+        <button id="createBtn" class="btn primary">Create question + insert QR on slide</button>
+      </div>
+
+      <div id="existingQuestionBlock" class="hidden">
+        <p><strong id="existingPrompt"></strong></p>
+        <p class="hint" id="existingStatus"></p>
+        <div class="btn-row">
+          <button id="startBtn" class="btn secondary">Start</button>
+          <button id="stopBtn" class="btn secondary">Stop</button>
+          <button id="refreshBtn" class="btn primary">Refresh slide now</button>
+        </div>
+        <label><input type="checkbox" id="synthesisToggle" /> Show synthesis on slide</label>
+        <p id="responseCountLine" class="hint"></p>
+      </div>
+
+      <p id="actionStatus" class="hint"></p>
+    </section>
+  </main>
+
+  <script src="taskpane.js"></script>
+</body>
+</html>

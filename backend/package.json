@@ -1,0 +1,33 @@
+{
+  "name": "@classroom-survey/backend",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Express + Socket.IO backend for the Live Classroom Survey app.",
+  "main": "src/index.js",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "dev": "node --watch src/index.js",
+    "start": "node src/index.js",
+    "test": "node --test test/"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cookie-parser": "^1.4.6",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "helmet": "^7.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "qrcode": "^1.5.3",
+    "socket.io": "^4.7.5",
+    "uuid": "^9.0.1",
+    "zod": "^3.23.8"
+  },
+  "optionalDependencies": {
+    "better-sqlite3": "^11.1.2"
+  },
+  "license": "MIT"
+}
