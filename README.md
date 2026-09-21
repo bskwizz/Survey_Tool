@@ -30,27 +30,49 @@ classroom-survey/
 
 ## Quickstart (local dev)
 
+The backend serves everything from one origin: the API, the participant app
+(`/join/<code>`, which is what the QR code encodes), the instructor dashboard
+(`/dashboard/`), and the PowerPoint add-in files (`/powerpoint-addin/`). One
+host, one URL, no CORS configuration.
+
 ```bash
-# 1. Install dependencies (workspaces install backend + both frontends)
+# 1. Install dependencies
 npm install
 
 # 2. Configure environment
 cp .env.example backend/.env
-# edit backend/.env - at minimum, set JWT_SECRET and PARTICIPANT_TOKEN_SECRET
-# to random values. Leave SYNTHESIS_PROVIDER=mock to run fully offline.
+# set JWT_SECRET and PARTICIPANT_TOKEN_SECRET to random values.
+# Leave SYNTHESIS_PROVIDER=mock to run fully offline, or set it to
+# "anthropic" and put your Anthropic API key in AI_API_KEY.
 
-# 3. Start the backend (Express + Socket.IO on PORT, default 3000)
+# 3. Start the server
 npm run dev
-# -> backend/src/index.js listens on http://localhost:3000
+# -> http://localhost:3000/dashboard/  (instructor dashboard)
 
-# 4. In separate terminals, serve the two static frontends
-npm run dev --workspace=frontend/participant          # http://localhost:5173
-npm run dev --workspace=frontend/instructor-dashboard  # http://localhost:5174
-
-# 5. Open the instructor dashboard, register an account, create a
-#    presentation + question, then open the participant URL it gives you
-#    (or scan its QR code) on your phone to answer.
+# 4. Register an instructor account on the dashboard, create a presentation
+#    and a question, then open the participant URL it gives you on a phone.
 ```
+
+The separate `npm run dev --workspace=frontend/...` static servers still
+work if you want to iterate on a frontend in isolation, but they are no
+longer needed.
+
+## Deploying to Azure (one command)
+
+Students' phones must reach the server over the public internet and
+PowerPoint only loads add-ins over HTTPS, so the app has to run on a real
+host. `scripts/deploy-azure.sh` creates (or updates) a single Linux App
+Service and deploys the working tree to it:
+
+```bash
+az login
+AI_API_KEY=sk-ant-... scripts/deploy-azure.sh <globally-unique-app-name>
+```
+
+It generates secrets, turns on WebSockets, sets persistent storage for the
+JSON store, deploys, and rewrites `powerpoint-addin/manifest.xml` to point at
+the new host. Omit `AI_API_KEY` to deploy with the offline mock synthesizer.
+Re-run it any time to redeploy; existing secrets are preserved.
 
 ### Running the PowerPoint Add-in locally
 
@@ -88,8 +110,9 @@ Microsoft 365 admin center for org-wide add-in publishing).
   rescan), producing live percentages, distributions, and a normalized-
   entropy "consensus vs. disagreement" score.
 - **Open-text synthesis:** a pluggable `SynthesisProvider` interface with a
-  deterministic, offline `MockSynthesisProvider` (default) and an
-  `OpenAiSynthesisProvider`. New responses are batched (by count or time)
+  deterministic, offline `MockSynthesisProvider` (default), an
+  `AnthropicSynthesisProvider` (Claude via the official SDK with
+  schema-constrained JSON output), and an `OpenAiSynthesisProvider`. New responses are batched (by count or time)
   and synthesized **incrementally** - each run updates the previous
   synthesis using only the new responses, never regenerating from scratch.
 - Full details, ASCII diagrams, and the PowerPoint Slide-Show limitation
@@ -116,7 +139,9 @@ Microsoft 365 admin center for org-wide add-in publishing).
       live counts, raw responses, synthesis view, "show synthesis on slide"
       toggle.
 - [x] PowerPoint task pane: create a question for the current slide, insert
-      a QR image + result text box, Start/Stop, and "Refresh slide now".
+      a QR image + result text box, Start/Stop, "Refresh slide now", and an
+      auto-refresh toggle that keeps the slide live while presenting in
+      "Browsed by an individual (window)" mode.
 - [x] Add-in code documents the Slide-Show limitation and its workaround.
 - [x] No secrets committed; `.env.example` only, `.env` gitignored.
 

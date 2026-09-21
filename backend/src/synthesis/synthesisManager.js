@@ -3,6 +3,7 @@
 const config = require('../config');
 const { MockSynthesisProvider } = require('./MockSynthesisProvider');
 const { OpenAiSynthesisProvider } = require('./OpenAiSynthesisProvider');
+const { AnthropicSynthesisProvider } = require('./AnthropicSynthesisProvider');
 
 /**
  * SynthesisManager
@@ -33,6 +34,21 @@ class SynthesisManager {
   }
 
   static buildProviderFromConfig() {
+    if (config.synthesisProvider === 'anthropic') {
+      try {
+        return new AnthropicSynthesisProvider({
+          apiKey: config.aiApiKey,
+          model: config.aiModel,
+          effort: config.aiEffort,
+        });
+      } catch (err) {
+        console.warn(
+          `[synthesis] Failed to initialize AnthropicSynthesisProvider (${err.message}). ` +
+            'Falling back to MockSynthesisProvider.'
+        );
+        return new MockSynthesisProvider();
+      }
+    }
     if (config.synthesisProvider === 'openai') {
       try {
         return new OpenAiSynthesisProvider({
@@ -70,6 +86,17 @@ class SynthesisManager {
       bucket.timer = setTimeout(() => this._flush(questionId), config.synthesisBatchIntervalMs);
       if (bucket.timer.unref) bucket.timer.unref();
     }
+  }
+
+  /**
+   * Forget any pending (not yet synthesized) responses for a question. Called
+   * when the instructor clears responses or deletes the question, so a batch
+   * timer can't fire afterwards and resurrect the cleared texts.
+   */
+  discard(questionId) {
+    const bucket = this._pending.get(questionId);
+    if (bucket && bucket.timer) clearTimeout(bucket.timer);
+    this._pending.delete(questionId);
   }
 
   async _flush(questionId) {

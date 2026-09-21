@@ -12,7 +12,16 @@ const httpServer = http.createServer();
 const io = createSocketServer(httpServer);
 const { app } = createApp({ io });
 
-httpServer.on('request', app);
+// Socket.IO registered its own 'request' listener when it attached above and
+// answers everything under /socket.io/ itself (handshake, polling, and the
+// bundled client script). Node fires every 'request' listener, so Express
+// must skip those paths or it will try to 404 a response Socket.IO already
+// sent, which throws ERR_HTTP_HEADERS_SENT and drops the connection.
+const socketPath = io.path();
+httpServer.on('request', (req, res) => {
+  if (req.url === socketPath || req.url.startsWith(`${socketPath}/`)) return;
+  app(req, res);
+});
 
 httpServer.listen(config.port, () => {
   console.log(`[classroom-survey] backend listening on port ${config.port} (${config.nodeEnv})`);

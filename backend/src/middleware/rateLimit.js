@@ -40,6 +40,12 @@ function createDuplicateSubmissionGuard({ repository }) {
     if (!req.participantToken) {
       return res.status(401).json({ error: 'Missing participant token' });
     }
+    // Instructors can opt an open-text question into multiple answers per
+    // device (brainstorm style); the one-answer rule is skipped for those.
+    const question = questionId ? await repository.getQuestion(questionId) : null;
+    if (question && question.allowMultiple && question.type === 'open_text') {
+      return next();
+    }
     const already = await repository.hasParticipantAnswered(questionId, req.participantToken);
     if (already) {
       return res.status(409).json({ error: 'This device has already answered this question' });

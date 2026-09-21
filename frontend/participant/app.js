@@ -19,6 +19,7 @@
     answerArea: document.getElementById('answerArea'),
     submitBtn: document.getElementById('submitBtn'),
     thankYouView: document.getElementById('thankYouView'),
+    answerAgainBtn: document.getElementById('answerAgainBtn'),
     liveAggregate: document.getElementById('liveAggregate'),
     waitingView: document.getElementById('waitingView'),
     errorView: document.getElementById('errorView'),
@@ -157,6 +158,15 @@
   function renderThankYou(aggregate) {
     showOnly(els.thankYouView);
     renderLiveAggregate(aggregate);
+    // Open-text questions can be opted into several answers per person.
+    const again = !!(currentQuestion && currentQuestion.allowMultiple);
+    els.answerAgainBtn.classList.toggle('hidden', !again);
+  }
+
+  function answerAgain() {
+    if (!currentQuestion) return;
+    renderQuestion(currentQuestion);
+    showOnly(els.questionView);
   }
 
   function renderLiveAggregate(aggregate) {
@@ -217,6 +227,7 @@
 
   async function init() {
     els.submitBtn.addEventListener('click', submitResponse);
+    els.answerAgainBtn.addEventListener('click', answerAgain);
     const { shortCode, questionId } = parseLocation();
 
     try {

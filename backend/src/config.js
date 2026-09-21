@@ -38,13 +38,14 @@ const config = Object.freeze({
   storageEngine: (process.env.STORAGE_ENGINE || 'json').toLowerCase(), // 'json' | 'sqlite'
   dataDir: process.env.DATA_DIR || path.resolve(__dirname, '..', 'data'),
 
-  synthesisProvider: (process.env.SYNTHESIS_PROVIDER || 'mock').toLowerCase(), // 'mock' | 'openai'
+  synthesisProvider: (process.env.SYNTHESIS_PROVIDER || 'mock').toLowerCase(), // 'mock' | 'anthropic' | 'openai'
   aiApiKey: process.env.AI_API_KEY || '',
   aiApiBaseUrl: process.env.AI_API_BASE_URL || 'https://api.openai.com/v1',
-  aiModel: process.env.AI_MODEL || 'gpt-4o-mini',
+  aiModel: process.env.AI_MODEL || '', // provider-specific default applies when empty
+  aiEffort: process.env.AI_EFFORT || 'low',
 
   synthesisBatchSize: num(process.env.SYNTHESIS_BATCH_SIZE, 5),
-  synthesisBatchIntervalMs: num(process.env.SYNTHESIS_BATCH_INTERVAL_MS, 20000),
+  synthesisBatchIntervalMs: num(process.env.SYNTHESIS_BATCH_INTERVAL_MS, 8000),
 
   rateLimitWindowMs: num(process.env.RATE_LIMIT_WINDOW_MS, 60000),
   rateLimitMax: num(process.env.RATE_LIMIT_MAX, 120),

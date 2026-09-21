@@ -4,11 +4,12 @@ node_modules/
 dist/
 build/
 .DS_Store
-data/*.json
-!data/.gitkeep
+backend/data/*.json
+!backend/data/.gitkeep
 coverage/
 .vscode/
 *.pem
 *.key
 *.crt
 office-addin-dev-certs/
+data/*.json

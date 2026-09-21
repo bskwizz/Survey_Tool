@@ -129,6 +129,8 @@
   }
 
   function renderOptionsInputs() {
+    const allowMultipleLabel = document.getElementById('allowMultipleCreateLabel');
+    if (allowMultipleLabel) allowMultipleLabel.classList.toggle('hidden', els.questionTypeSelect.value !== 'open_text');
     els.optionsContainer.innerHTML = '';
     if (els.questionTypeSelect.value !== 'multiple_choice') return;
     for (let i = 0; i < 4; i++) {
@@ -152,10 +154,13 @@
     if (!presentationId) return alert('Create or select a presentation first.');
     if (!prompt) return alert('Prompt is required.');
 
+    const allowMultipleEl = document.getElementById('allowMultipleCreate');
+    const allowMultiple = type === 'open_text' && !!(allowMultipleEl && allowMultipleEl.checked);
+
     try {
       await apiFetch('/api/questions', {
         method: 'POST',
-        body: JSON.stringify({ presentationId, slideRef, type, prompt, options }),
+        body: JSON.stringify({ presentationId, slideRef, type, prompt, options, allowMultiple }),
       });
       els.promptInput.value = '';
       await loadQuestions();
@@ -226,6 +231,7 @@
         <button class="btn ghost" id="stopBtn">Stop</button>
         <button class="btn danger" id="clearBtn">Clear responses</button>
         <label><input type="checkbox" id="showSynthesisToggle" ${question.showSynthesisOnSlide ? 'checked' : ''}/> Show synthesis on slide</label>
+        ${isOpenText ? `<label><input type="checkbox" id="allowMultipleToggle" ${question.allowMultiple ? 'checked' : ''}/> Allow multiple answers per person</label>` : ''}
       </div>
       <div class="detail-grid">
         <div>
@@ -251,6 +257,15 @@
         body: JSON.stringify({ showSynthesisOnSlide: e.target.checked }),
       });
     });
+    const allowMultipleToggle = document.getElementById('allowMultipleToggle');
+    if (allowMultipleToggle) {
+      allowMultipleToggle.addEventListener('change', async (e) => {
+        await apiFetch(`/api/questions/${question.id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ allowMultiple: e.target.checked }),
+        });
+      });
+    }
   }
 
   function renderAggregateHtml(aggregate) {

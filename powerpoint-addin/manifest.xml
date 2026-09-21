@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  Live Classroom Survey - PowerPoint Task Pane Add-in Manifest (Office Add-in XML manifest schema).
+  Nashville Hot Tip Survey - PowerPoint Task Pane Add-in Manifest (Office Add-in XML manifest schema).
 
   *** IMPORTANT ***
-  All URLs below use `https://localhost:3000` as a placeholder for LOCAL DEV
+  All URLs below use `https://live-classroom-survey.azurewebsites.net` as a placeholder for LOCAL DEV
   ONLY (paired with `office-addin-dev-certs` for local HTTPS - see
   docs/DEPLOYMENT.md). Before publishing/sideloading against a real
-  deployment, replace every `https://localhost:3000` occurrence with your
+  deployment, replace every `https://live-classroom-survey.azurewebsites.net` occurrence with your
   deployed HTTPS URL (e.g. `https://your-app.azurestaticapps.net`).
 -->
 <OfficeApp
@@ -18,16 +18,16 @@
 
   <Id>b1a2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d</Id>
   <Version>1.0.0.0</Version>
-  <ProviderName>Live Classroom Survey</ProviderName>
+  <ProviderName>Bryan Skwirut</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
-  <DisplayName DefaultValue="Live Classroom Survey" />
+  <DisplayName DefaultValue="Nashville Hot Tip Survey" />
   <Description DefaultValue="Create live audience-response questions on your slides, share a QR code, and see results and AI synthesis update in real time." />
-  <IconUrl DefaultValue="https://localhost:3000/powerpoint-addin/assets/icon-32.png" />
-  <HighResolutionIconUrl DefaultValue="https://localhost:3000/powerpoint-addin/assets/icon-80.png" />
-  <SupportUrl DefaultValue="https://localhost:3000/support" />
+  <IconUrl DefaultValue="https://live-classroom-survey.azurewebsites.net/powerpoint-addin/assets/icon-32.png" />
+  <HighResolutionIconUrl DefaultValue="https://live-classroom-survey.azurewebsites.net/powerpoint-addin/assets/icon-80.png" />
+  <SupportUrl DefaultValue="https://live-classroom-survey.azurewebsites.net/support" />
 
   <AppDomains>
-    <AppDomain>https://localhost:3000</AppDomain>
+    <AppDomain>https://live-classroom-survey.azurewebsites.net</AppDomain>
   </AppDomains>
 
   <Hosts>
@@ -35,7 +35,7 @@
   </Hosts>
 
   <DefaultSettings>
-    <SourceLocation DefaultValue="https://localhost:3000/powerpoint-addin/taskpane.html" />
+    <SourceLocation DefaultValue="https://live-classroom-survey.azurewebsites.net/powerpoint-addin/taskpane.html" />
   </DefaultSettings>
 
   <Permissions>ReadWriteDocument</Permissions>
@@ -86,23 +86,23 @@
 
     <Resources>
       <bt:Images>
-        <bt:Image id="Icon.16x16" DefaultValue="https://localhost:3000/powerpoint-addin/assets/icon-16.png" />
-        <bt:Image id="Icon.32x32" DefaultValue="https://localhost:3000/powerpoint-addin/assets/icon-32.png" />
-        <bt:Image id="Icon.80x80" DefaultValue="https://localhost:3000/powerpoint-addin/assets/icon-80.png" />
+        <bt:Image id="Icon.16x16" DefaultValue="https://live-classroom-survey.azurewebsites.net/powerpoint-addin/assets/icon-16.png" />
+        <bt:Image id="Icon.32x32" DefaultValue="https://live-classroom-survey.azurewebsites.net/powerpoint-addin/assets/icon-32.png" />
+        <bt:Image id="Icon.80x80" DefaultValue="https://live-classroom-survey.azurewebsites.net/powerpoint-addin/assets/icon-80.png" />
       </bt:Images>
       <bt:Urls>
-        <bt:Url id="Commands.Url" DefaultValue="https://localhost:3000/powerpoint-addin/commands.html" />
-        <bt:Url id="Taskpane.Url" DefaultValue="https://localhost:3000/powerpoint-addin/taskpane.html" />
-        <bt:Url id="GetStarted.LearnMoreUrl" DefaultValue="https://localhost:3000/docs" />
+        <bt:Url id="Commands.Url" DefaultValue="https://live-classroom-survey.azurewebsites.net/powerpoint-addin/commands.html" />
+        <bt:Url id="Taskpane.Url" DefaultValue="https://live-classroom-survey.azurewebsites.net/powerpoint-addin/taskpane.html" />
+        <bt:Url id="GetStarted.LearnMoreUrl" DefaultValue="https://live-classroom-survey.azurewebsites.net/docs" />
       </bt:Urls>
       <bt:ShortStrings>
-        <bt:String id="GetStarted.Title" DefaultValue="Get started with Live Classroom Survey" />
+        <bt:String id="GetStarted.Title" DefaultValue="Get started with Nashville Hot Tip Survey" />
         <bt:String id="ClassroomSurvey.Group.Label" DefaultValue="Classroom Survey" />
-        <bt:String id="TaskpaneButton.Label" DefaultValue="Live Survey" />
+        <bt:String id="TaskpaneButton.Label" DefaultValue="Hot Tip Survey" />
       </bt:ShortStrings>
       <bt:LongStrings>
         <bt:String id="GetStarted.Description" DefaultValue="Create a live question for this slide, share a QR code, and watch results update in real time." />
-        <bt:String id="TaskpaneButton.Tooltip" DefaultValue="Open the Live Classroom Survey task pane to create and manage questions for this slide." />
+        <bt:String id="TaskpaneButton.Tooltip" DefaultValue="Open the Nashville Hot Tip Survey task pane to create and manage questions for this slide." />
       </bt:LongStrings>
     </Resources>
   </VersionOverrides>

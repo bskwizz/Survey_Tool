@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
-  <title>Live Classroom Survey</title>
+  <title>Nashville Hot Tip Survey</title>
   <!--
     NOTE: In a real deployment, pin office.js to a specific released version
     per Microsoft's guidance, and load it from the official CDN as shown.
@@ -13,7 +13,7 @@
 </head>
 <body>
   <main id="app" class="pane">
-    <h1>Live Classroom Survey</h1>
+    <h1>Nashville Hot Tip Survey</h1>
     <p id="statusLine" class="hint">Loading Office.js…</p>
 
     <section id="authSection" class="section">
@@ -40,6 +40,7 @@
         <label>Prompt</label>
         <input type="text" id="promptInput" placeholder="e.g. Which approach is clearest?" />
         <div id="optionsBlock"></div>
+        <label id="allowMultipleCreateLabel" class="hidden"><input type="checkbox" id="allowMultipleCreate" /> Allow multiple answers per person</label>
         <button id="createBtn" class="btn primary">Create question + insert QR on slide</button>
       </div>
 
@@ -51,7 +52,13 @@
           <button id="stopBtn" class="btn secondary">Stop</button>
           <button id="refreshBtn" class="btn primary">Refresh slide now</button>
         </div>
+        <div class="btn-row">
+          <button id="clearBtn" class="btn secondary">Clear responses</button>
+          <button id="removeBtn" class="btn danger">Remove from slide</button>
+        </div>
         <label><input type="checkbox" id="synthesisToggle" /> Show synthesis on slide</label>
+        <label id="allowMultipleLabel" class="hidden"><input type="checkbox" id="allowMultipleToggle" /> Allow multiple answers per person</label>
+        <label><input type="checkbox" id="autoRefreshToggle" checked /> Auto-refresh slide every 5s (on by default)</label>
         <p id="responseCountLine" class="hint"></p>
       </div>
 

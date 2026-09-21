@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Live Classroom Survey - Instructor Dashboard</title>
+  <title>Nashville Hot Tip Survey - Instructor Dashboard</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <div class="layout">
     <header class="topbar">
-      <h1>Live Classroom Survey <span class="badge">Instructor</span></h1>
+      <h1>Nashville Hot Tip Survey <span class="badge">Instructor</span></h1>
       <div id="authStatus" class="auth-status"></div>
     </header>
 
@@ -53,6 +53,7 @@
           <input type="text" id="promptInput" placeholder="Question prompt" class="grow" />
         </div>
         <div id="optionsContainer" class="inline-form wrap"></div>
+        <label id="allowMultipleCreateLabel" class="hidden"><input type="checkbox" id="allowMultipleCreate" /> Allow multiple answers per person (open text)</label>
         <button id="createQuestionBtn" class="btn primary">Add Question</button>
       </section>
 

@@ -10,7 +10,7 @@ const { generateShortCode, buildParticipantUrl } = require('../utils/shortUrl');
 const { generateQrDataUri } = require('../utils/qrcode');
 const config = require('../config');
 
-function buildQuestionRoutes({ repository, io }) {
+function buildQuestionRoutes({ repository, io, synthesisManager = null }) {
   const router = express.Router();
 
   // ---- Create question (instructor only) ----
@@ -20,7 +20,7 @@ function buildQuestionRoutes({ repository, io }) {
     validateBody(createQuestionSchema),
     async (req, res) => {
       try {
-        const { presentationId, slideRef, type, prompt, options } = req.body;
+        const { presentationId, slideRef, type, prompt, options, allowMultiple } = req.body;
         const questionType = registry.get(type); // throws if unknown, but zod already enforces this
         questionType.validateDefinition({ prompt, options });
 
@@ -33,6 +33,9 @@ function buildQuestionRoutes({ repository, io }) {
           options,
           status: 'draft',
           showSynthesisOnSlide: false,
+          // Only open-text questions can accept several answers per device;
+          // choice and rating aggregates assume one answer per participant.
+          allowMultiple: type === 'open_text' && !!allowMultiple,
           shortCode: generateShortCode(),
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
@@ -68,7 +71,11 @@ function buildQuestionRoutes({ repository, io }) {
     async (req, res) => {
       const question = await repository.getQuestion(req.params.id);
       if (!question) return res.status(404).json({ error: 'Question not found' });
-      const updated = await repository.updateQuestion(req.params.id, req.body);
+      const patch = { ...req.body };
+      if (patch.allowMultiple && question.type !== 'open_text') {
+        return res.status(400).json({ error: 'Multiple answers are only supported for open-text questions' });
+      }
+      const updated = await repository.updateQuestion(req.params.id, patch);
       res.json({ question: updated });
     }
   );
@@ -94,6 +101,7 @@ function buildQuestionRoutes({ repository, io }) {
     const question = await repository.getQuestion(req.params.id);
     if (!question) return res.status(404).json({ error: 'Question not found' });
     await repository.clearResponsesForQuestion(req.params.id);
+    if (synthesisManager) synthesisManager.discard(req.params.id);
     const questionType = registry.get(question.type);
     await repository.saveAggregate(req.params.id, questionType.createEmptyAggregate(question));
     io.to(`question:${req.params.id}`).emit('response:new', {
@@ -106,7 +114,9 @@ function buildQuestionRoutes({ repository, io }) {
 
   // ---- Delete question ----
   router.delete('/questions/:id', requireInstructorAuth, async (req, res) => {
+    if (synthesisManager) synthesisManager.discard(req.params.id);
     await repository.deleteQuestion(req.params.id);
+    io.to(`question:${req.params.id}`).emit('question:status', { questionId: req.params.id, status: 'deleted' });
     res.status(204).end();
   });
 

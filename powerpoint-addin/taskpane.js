@@ -27,8 +27,12 @@
 (function () {
   'use strict';
 
-  // Replace with your deployed HTTPS backend URL before publishing.
-  const API_BASE = 'https://localhost:3000';
+  // The task pane is served by the same host as the API, so derive the
+  // base URL from our own origin. No per-deployment edit needed here; only
+  // manifest.xml carries the deployed hostname.
+  const API_BASE = window.location.origin;
+  const AUTO_REFRESH_MS = 5000;
+  let autoRefreshTimer = null;
   const TOKEN_KEY_SETTING = 'classroomSurvey.instructorToken';
   const SLIDE_QUESTION_MAP_SETTING = 'classroomSurvey.slideQuestionMap'; // { [slideId]: questionId }
 
@@ -54,7 +58,8 @@
       'mainSection', 'slideIdLine', 'noQuestionBlock', 'presentationSelect', 'typeSelect',
       'promptInput', 'optionsBlock', 'createBtn', 'existingQuestionBlock', 'existingPrompt',
       'existingStatus', 'startBtn', 'stopBtn', 'refreshBtn', 'synthesisToggle',
-      'responseCountLine', 'actionStatus',
+      'autoRefreshToggle', 'clearBtn', 'removeBtn', 'responseCountLine', 'actionStatus',
+      'allowMultipleCreate', 'allowMultipleCreateLabel', 'allowMultipleToggle', 'allowMultipleLabel',
     ].forEach((id) => { els[id] = document.getElementById(id); });
   }
 
@@ -66,7 +71,65 @@
     els.stopBtn.addEventListener('click', () => handleQuestionAction('stop'));
     els.refreshBtn.addEventListener('click', handleRefreshSlide);
     els.synthesisToggle.addEventListener('change', handleToggleSynthesis);
+    els.allowMultipleToggle.addEventListener('change', handleToggleAllowMultiple);
+    els.autoRefreshToggle.addEventListener('change', handleToggleAutoRefresh);
+    els.clearBtn.addEventListener('click', () => confirmThen(els.clearBtn, 'Clear responses', handleClearResponses));
+    els.removeBtn.addEventListener('click', () => confirmThen(els.removeBtn, 'Remove from slide', handleRemoveFromSlide));
     renderOptionInputs();
+  }
+
+  // ---------------- Two-click confirmation ----------------
+  //
+  // Native confirm() dialogs are unreliable inside Office task panes, so a
+  // destructive button arms itself on the first click and only acts if
+  // clicked again within a few seconds.
+
+  const ARM_MS = 6000;
+  function confirmThen(button, label, action) {
+    if (button.dataset.armed === '1') {
+      disarm(button, label);
+      action();
+      return;
+    }
+    button.dataset.armed = '1';
+    button.classList.add('armed');
+    button.textContent = 'Click again to confirm';
+    setActionStatus(`${label}: click the button again within ${ARM_MS / 1000}s to confirm.`);
+    button._disarmTimer = setTimeout(() => {
+      disarm(button, label);
+      setActionStatus('Cancelled.');
+    }, ARM_MS);
+  }
+
+  function disarm(button, label) {
+    clearTimeout(button._disarmTimer);
+    button.dataset.armed = '0';
+    button.classList.remove('armed');
+    button.textContent = label;
+  }
+
+  // ---------------- Auto-refresh (keeps the slide live while presenting) ----------------
+  //
+  // Polls the backend and rewrites the slide's result text box every few
+  // seconds while the task pane is open. Combined with "Browsed by an
+  // individual (window)" presenting mode this gives effectively live
+  // results on the slide without the instructor clicking anything.
+
+  function handleToggleAutoRefresh(e) {
+    if (e.target.checked) startAutoRefresh();
+    else stopAutoRefresh();
+  }
+
+  function startAutoRefresh() {
+    stopAutoRefresh();
+    autoRefreshTimer = setInterval(() => {
+      if (currentQuestion) handleRefreshSlide({ quiet: true });
+    }, AUTO_REFRESH_MS);
+  }
+
+  function stopAutoRefresh() {
+    if (autoRefreshTimer) clearInterval(autoRefreshTimer);
+    autoRefreshTimer = null;
   }
 
   function setStatus(msg) { els.statusLine.textContent = msg; }
@@ -143,6 +206,13 @@
     Office.context.document.settings.saveAsync();
   }
 
+  function clearSlideQuestionId(slideId) {
+    const map = getSlideQuestionMap();
+    delete map[slideId];
+    Office.context.document.settings.set(SLIDE_QUESTION_MAP_SETTING, map);
+    Office.context.document.settings.saveAsync();
+  }
+
   async function getCurrentSlideId() {
     return PowerPoint.run(async (context) => {
       const slides = context.presentation.getSelectedSlides();
@@ -167,6 +237,8 @@
 
       if (!questionId) {
         currentQuestion = null;
+        stopAutoRefresh();
+        els.autoRefreshToggle.checked = false;
         els.noQuestionBlock.classList.remove('hidden');
         els.existingQuestionBlock.classList.add('hidden');
         return;
@@ -177,8 +249,18 @@
       els.noQuestionBlock.classList.add('hidden');
       els.existingQuestionBlock.classList.remove('hidden');
       els.existingPrompt.textContent = question.prompt;
-      els.existingStatus.textContent = `Type: ${question.type} · Status: ${question.status}`;
+      els.existingStatus.textContent = `Type: ${question.type} · Status: ${question.status}` +
+        (question.allowMultiple ? ' · multiple answers allowed' : '');
       els.synthesisToggle.checked = !!question.showSynthesisOnSlide;
+      els.allowMultipleLabel.classList.toggle('hidden', question.type !== 'open_text');
+      els.allowMultipleToggle.checked = !!question.allowMultiple;
+      // Live by default: as soon as a question is loaded for this slide,
+      // keep the slide's results text box updating. The toggle stays
+      // available to pause it.
+      if (!autoRefreshTimer) {
+        els.autoRefreshToggle.checked = true;
+        startAutoRefresh();
+      }
       await updateResponseCountLine();
     } catch (err) {
       setActionStatus(err.message);
@@ -199,6 +281,8 @@
 
   function renderOptionInputs() {
     els.optionsBlock.innerHTML = '';
+    // "Allow multiple answers" only makes sense for open text.
+    els.allowMultipleCreateLabel.classList.toggle('hidden', els.typeSelect.value !== 'open_text');
     if (els.typeSelect.value !== 'multiple_choice') return;
     for (let i = 0; i < 4; i++) {
       const input = document.createElement('input');
@@ -223,9 +307,10 @@
       if (!prompt) throw new Error('Prompt is required.');
       if (!currentSlideId) currentSlideId = await getCurrentSlideId();
 
+      const allowMultiple = type === 'open_text' && els.allowMultipleCreate.checked;
       const { question, participantUrl } = await apiFetch('/api/questions', {
         method: 'POST',
-        body: JSON.stringify({ presentationId, slideRef: currentSlideId, type, prompt, options }),
+        body: JSON.stringify({ presentationId, slideRef: currentSlideId, type, prompt, options, allowMultiple }),
       });
 
       setSlideQuestionId(currentSlideId, question.id);
@@ -252,44 +337,123 @@
     const { qrDataUri } = await apiFetch(`/api/questions/${questionId}/qrcode`);
     const base64 = qrDataUri.split(',')[1]; // strip "data:image/png;base64,"
 
+    // Step 1: clear any earlier QR/placeholder shapes on this slide (only
+    // shapes that are genuinely ours), add the results text box, and record
+    // the IDs of every shape present so the new picture can be identified.
+    let idsBefore = new Set();
     await PowerPoint.run(async (context) => {
-      const slides = context.presentation.getSelectedSlides();
-      slides.load('items');
-      await context.sync();
-      const slide = slides.items[0];
-
-      const existingShapes = slide.shapes;
-      existingShapes.load('items/name');
-      await context.sync();
-
-      // Remove any previous QR/placeholder shapes from an earlier question
-      // on this same slide before inserting fresh ones.
-      for (const shape of existingShapes.items) {
-        if (shape.name === 'ClassroomSurveyQR' || shape.name === 'ClassroomSurveyText') {
-          shape.delete();
-        }
+      const { slide, shapes } = await loadSlideShapes(context);
+      for (const shape of shapes.items) {
+        if (isOurQr(shape) || isOurText(shape)) shape.delete();
       }
       await context.sync();
 
-      const qrShape = slide.shapes.addImage(base64, {
-        left: 20,
-        top: 20,
-        height: 160,
-        width: 160,
-      });
-      qrShape.name = 'ClassroomSurveyQR';
-
-      const textShape = slide.shapes.addTextBox(`Scan to answer! ${participantUrl}\nResponses: 0`, {
-        left: 200,
-        top: 20,
-        height: 160,
-        width: 380,
-      });
-      textShape.name = 'ClassroomSurveyText';
-      textShape.textFrame.textRange.font.size = 14;
-
+      createResultsTextBox(slide, `Scan to answer! ${participantUrl}\nResponses: 0`);
       await context.sync();
+
+      const after = slide.shapes;
+      after.load('items/id');
+      await context.sync();
+      idsBefore = new Set(after.items.map((sh) => sh.id));
     });
+
+    // Step 2: insert the QR picture. The PowerPoint-specific
+    // `shapes.addPicture` is still preview-only, so in shipping builds we use
+    // the Common API image coercion, which places the picture on the current
+    // slide at the given position (points).
+    const namedNatively = await insertPictureOnCurrentSlide(base64, { left: 20, top: 20, width: 160, height: 160 });
+    if (namedNatively) return;
+
+    // Step 3: the one shape that did not exist before is the picture. Name
+    // it so "Refresh" and "Remove" can find it. Never use the selection for
+    // this: on some hosts the insert leaves the previous selection (often
+    // the slide title) in place.
+    await PowerPoint.run(async (context) => {
+      const slide = context.presentation.getSelectedSlides().getItemAt(0);
+      const shapes = slide.shapes;
+      shapes.load('items/id,items/type');
+      await context.sync();
+      const added = shapes.items.filter((sh) => !idsBefore.has(sh.id));
+      const picture = added.find((sh) => sh.type === 'Image') || added[0];
+      if (picture) {
+        picture.name = QR_NAME;
+        await context.sync();
+      }
+    });
+  }
+
+  const QR_NAME = 'ClassroomSurveyQR';
+  const TEXT_NAME = 'ClassroomSurveyText';
+  const TEXT_BOX_OPTIONS = { left: 200, top: 20, height: 160, width: 380 };
+
+  /** True only for a picture shape carrying our QR name. A title or text box with that name is a mistake. */
+  function isOurQr(shape) { return shape.name === QR_NAME && shape.type === 'Image'; }
+  function isOurText(shape) { return shape.name === TEXT_NAME && shape.type !== 'Image'; }
+
+  /**
+   * Loads the current slide's shapes (id, name, type), undoes any shape that
+   * was wrongly given one of our names (an earlier build named whatever was
+   * selected, which could be the slide title), and returns the slide, its
+   * shapes and a note describing any repair made.
+   */
+  async function loadSlideShapes(context) {
+    const slide = context.presentation.getSelectedSlides().getItemAt(0);
+    const shapes = slide.shapes;
+    shapes.load('items/id,items/name,items/type');
+    await context.sync();
+    const notes = [];
+    for (const shape of shapes.items) {
+      if (shape.name === QR_NAME && shape.type !== 'Image') {
+        shape.name = 'Title';
+        notes.push('restored a mis-named slide shape');
+      }
+    }
+    if (notes.length) await context.sync();
+    return { slide, shapes, notes };
+  }
+
+  function createResultsTextBox(slide, text) {
+    const textShape = slide.shapes.addTextBox(text, TEXT_BOX_OPTIONS);
+    textShape.name = TEXT_NAME;
+    textShape.textFrame.textRange.font.size = 14;
+    return textShape;
+  }
+
+  /** Inserts a base64 PNG on the current slide, preferring the native API when the host has it. */
+  async function insertPictureOnCurrentSlide(base64, { left, top, width, height }) {
+    let nativeSupported = false;
+    try {
+      await PowerPoint.run(async (context) => {
+        const slide = context.presentation.getSelectedSlides().getItemAt(0);
+        if (typeof slide.shapes.addPicture === 'function') {
+          const pic = slide.shapes.addPicture(base64, { left, top, width, height });
+          pic.name = QR_NAME;
+          await context.sync();
+          nativeSupported = true;
+        }
+      });
+    } catch (_err) {
+      nativeSupported = false; // fall through to the Common API path
+    }
+    if (nativeSupported) return true;
+
+    await new Promise((resolve, reject) => {
+      Office.context.document.setSelectedDataAsync(
+        base64,
+        {
+          coercionType: Office.CoercionType.Image,
+          imageLeft: left,
+          imageTop: top,
+          imageWidth: width,
+          imageHeight: height,
+        },
+        (result) => {
+          if (result.status === Office.AsyncResultStatus.Succeeded) resolve();
+          else reject(new Error(result.error ? result.error.message : 'Image insert failed'));
+        }
+      );
+    });
+    return false;
   }
 
   // ---------------- Start/Stop/Refresh ----------------
@@ -301,6 +465,71 @@
       await apiFetch(`/api/questions/${currentQuestion.id}/${action}`, { method: 'POST' });
       await refreshForCurrentSlide();
       setActionStatus('Done.');
+    } catch (err) {
+      setActionStatus(`Error: ${err.message}`);
+    }
+  }
+
+  /** Wipes answers and synthesis for this question but keeps the question and QR. */
+  async function handleClearResponses() {
+    if (!currentQuestion) return;
+    setActionStatus('Clearing responses…');
+    try {
+      await apiFetch(`/api/questions/${currentQuestion.id}/clear`, { method: 'POST' });
+      await handleRefreshSlide({ quiet: true });
+      setActionStatus('Responses cleared. The QR code still works.');
+    } catch (err) {
+      setActionStatus(`Error: ${err.message}`);
+    }
+  }
+
+  /**
+   * Detaches the question from this slide: removes the QR and results shapes,
+   * forgets the slide link stored in the document, and deletes the question
+   * (with its responses) on the server. The create form comes back so a new
+   * question can be made for the same slide.
+   */
+  async function handleRemoveFromSlide() {
+    if (!currentQuestion) return;
+    setActionStatus('Removing question from this slide…');
+    stopAutoRefresh();
+    const questionId = currentQuestion.id;
+    try {
+      await PowerPoint.run(async (context) => {
+        const { shapes } = await loadSlideShapes(context);
+        for (const shape of shapes.items) {
+          if (isOurQr(shape) || isOurText(shape)) shape.delete();
+        }
+        await context.sync();
+      });
+
+      if (!currentSlideId) currentSlideId = await getCurrentSlideId();
+      clearSlideQuestionId(currentSlideId);
+      currentQuestion = null;
+
+      try {
+        await apiFetch(`/api/questions/${questionId}`, { method: 'DELETE' });
+      } catch (err) {
+        // The slide is already clean; a server-side failure shouldn't block the instructor.
+        console.warn('Question delete failed on server:', err.message);
+      }
+
+      await refreshForCurrentSlide();
+      setActionStatus('Question removed. You can create a new one for this slide.');
+    } catch (err) {
+      setActionStatus(`Error: ${err.message}`);
+    }
+  }
+
+  async function handleToggleAllowMultiple(e) {
+    if (!currentQuestion) return;
+    try {
+      const { question } = await apiFetch(`/api/questions/${currentQuestion.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ allowMultiple: e.target.checked }),
+      });
+      currentQuestion = question;
+      setActionStatus(question.allowMultiple ? 'Participants can now submit several answers.' : 'One answer per person.');
     } catch (err) {
       setActionStatus(`Error: ${err.message}`);
     }
@@ -326,9 +555,9 @@
    * on-canvas results current, including during "Browsed by an individual
    * (window)" presenting mode - see the file-level comment above.
    */
-  async function handleRefreshSlide() {
+  async function handleRefreshSlide({ quiet = false } = {}) {
     if (!currentQuestion) return;
-    setActionStatus('Refreshing…');
+    if (!quiet) setActionStatus('Refreshing…');
     try {
       const [{ aggregate }, synthResult, qrResult] = await Promise.all([
         apiFetch(`/api/questions/${currentQuestion.id}/aggregate`),
@@ -340,24 +569,24 @@
 
       const summaryText = buildSlideSummaryText(aggregate, synthResult.synthesis, qrResult.participantUrl);
 
+      let note = '';
       await PowerPoint.run(async (context) => {
-        const slides = context.presentation.getSelectedSlides();
-        slides.load('items');
-        await context.sync();
-        const slide = slides.items[0];
-        const shapes = slide.shapes;
-        shapes.load('items/name');
-        await context.sync();
-
-        const textShape = shapes.items.find((s) => s.name === 'ClassroomSurveyText');
+        const { slide, shapes, notes } = await loadSlideShapes(context);
+        let textShape = shapes.items.find(isOurText);
         if (textShape) {
           textShape.textFrame.textRange.text = summaryText;
+        } else {
+          // The results box is missing (deleted by hand, or lost to an
+          // earlier naming bug). Recreate it rather than silently doing nothing.
+          createResultsTextBox(slide, summaryText);
+          notes.push('results text box was missing and has been recreated');
         }
         await context.sync();
+        note = notes.length ? ` (${notes.join('; ')})` : '';
       });
 
       await updateResponseCountLine();
-      setActionStatus('Slide refreshed.');
+      setActionStatus((quiet ? `Live: updated ${new Date().toLocaleTimeString()}` : 'Slide refreshed.') + note);
     } catch (err) {
       setActionStatus(`Error: ${err.message}`);
     }
