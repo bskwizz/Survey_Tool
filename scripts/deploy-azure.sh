@@ -47,6 +47,7 @@ az webapp config appsettings set -g "$RG" -n "$APP" -o none --settings \
   PUBLIC_BASE_URL="$HOST" \
   CORS_ORIGIN="$HOST" \
   JWT_SECRET="$JWT_SECRET" \
+  JWT_EXPIRES_IN="${JWT_EXPIRES_IN:-30d}" \
   PARTICIPANT_TOKEN_SECRET="$PT_SECRET" \
   STORAGE_ENGINE=json \
   DATA_DIR=/home/data \

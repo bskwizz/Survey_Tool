@@ -29,7 +29,7 @@ const config = Object.freeze({
   publicBaseUrl: process.env.PUBLIC_BASE_URL || 'http://localhost:3000',
 
   jwtSecret: process.env.JWT_SECRET || 'dev-only-insecure-secret-change-me',
-  jwtExpiresIn: process.env.JWT_EXPIRES_IN || '12h',
+  jwtExpiresIn: process.env.JWT_EXPIRES_IN || '30d',
   participantTokenSecret:
     process.env.PARTICIPANT_TOKEN_SECRET || 'dev-only-insecure-participant-secret-change-me',
 

@@ -60,6 +60,7 @@
       'existingStatus', 'startBtn', 'stopBtn', 'refreshBtn', 'synthesisToggle',
       'autoRefreshToggle', 'clearBtn', 'removeBtn', 'responseCountLine', 'actionStatus',
       'allowMultipleCreate', 'allowMultipleCreateLabel', 'allowMultipleToggle', 'allowMultipleLabel',
+      'signOutBtn',
     ].forEach((id) => { els[id] = document.getElementById(id); });
   }
 
@@ -72,6 +73,7 @@
     els.refreshBtn.addEventListener('click', handleRefreshSlide);
     els.synthesisToggle.addEventListener('change', handleToggleSynthesis);
     els.allowMultipleToggle.addEventListener('change', handleToggleAllowMultiple);
+    els.signOutBtn.addEventListener('click', () => signOut(''));
     els.autoRefreshToggle.addEventListener('change', handleToggleAutoRefresh);
     els.clearBtn.addEventListener('click', () => confirmThen(els.clearBtn, 'Clear responses', handleClearResponses));
     els.removeBtn.addEventListener('click', () => confirmThen(els.removeBtn, 'Remove from slide', handleRemoveFromSlide));
@@ -152,8 +154,25 @@
     if (token) headers.Authorization = `Bearer ${token}`;
     const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
     const data = await res.json().catch(() => ({}));
+    if (res.status === 401 && token) {
+      // The instructor token expired or was revoked: drop it and go back to
+      // the sign-in form instead of leaving a half-working pane.
+      signOut('Your session expired. Please sign in again.');
+      throw new Error('Session expired');
+    }
     if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
     return data;
+  }
+
+  function signOut(message) {
+    stopAutoRefresh();
+    Office.context.document.settings.remove(TOKEN_KEY_SETTING);
+    Office.context.document.settings.saveAsync();
+    currentQuestion = null;
+    els.authSection.classList.remove('hidden');
+    els.mainSection.classList.add('hidden');
+    els.authError.textContent = message || '';
+    setStatus('Signed out.');
   }
 
   async function handleSignIn() {
@@ -344,11 +363,12 @@
     await PowerPoint.run(async (context) => {
       const { slide, shapes } = await loadSlideShapes(context);
       for (const shape of shapes.items) {
-        if (isOurQr(shape) || isOurText(shape)) shape.delete();
+        if (isOurShape(shape)) shape.delete();
       }
       await context.sync();
 
-      createResultsTextBox(slide, `Scan to answer! ${participantUrl}\nResponses: 0`);
+      createResultsTextBox(slide, "WHAT WE'VE RECEIVED (0)\n\nNo answers yet.");
+      createThemesTextBox(slide, 'WHAT IT MEANS\n\nWaiting for answers…');
       await context.sync();
 
       const after = slide.shapes;
@@ -383,12 +403,21 @@
   }
 
   const QR_NAME = 'ClassroomSurveyQR';
-  const TEXT_NAME = 'ClassroomSurveyText';
-  const TEXT_BOX_OPTIONS = { left: 200, top: 20, height: 160, width: 380 };
+  const TEXT_NAME = 'ClassroomSurveyText';      // left column: raw answers ("what we've received")
+  const THEMES_NAME = 'ClassroomSurveyThemes';  // right column: synthesis ("what it means")
+  // Geometry in points. Sized to fit a 4:3 slide (720 wide); on 16:9 there is
+  // spare room on the right. Refreshes only rewrite text, so an instructor
+  // can drag or resize either box and the layout sticks.
+  const LEFT_BOX = { left: 20, top: 195, width: 335, height: 325 };
+  const RIGHT_BOX = { left: 370, top: 195, width: 335, height: 325 };
+  const MAX_RAW_LINES = 12;
+  const MAX_THEMES = 3;
 
   /** True only for a picture shape carrying our QR name. A title or text box with that name is a mistake. */
   function isOurQr(shape) { return shape.name === QR_NAME && shape.type === 'Image'; }
   function isOurText(shape) { return shape.name === TEXT_NAME && shape.type !== 'Image'; }
+  function isOurThemes(shape) { return shape.name === THEMES_NAME && shape.type !== 'Image'; }
+  function isOurShape(shape) { return isOurQr(shape) || isOurText(shape) || isOurThemes(shape); }
 
   /**
    * Loads the current slide's shapes (id, name, type), undoes any shape that
@@ -412,11 +441,63 @@
     return { slide, shapes, notes };
   }
 
-  function createResultsTextBox(slide, text) {
-    const textShape = slide.shapes.addTextBox(text, TEXT_BOX_OPTIONS);
-    textShape.name = TEXT_NAME;
-    textShape.textFrame.textRange.font.size = 14;
-    return textShape;
+  function createColumn(slide, name, geometry, text) {
+    const shape = slide.shapes.addTextBox(text, geometry);
+    shape.name = name;
+    shape.textFrame.textRange.font.size = 12;
+    shape.textFrame.wordWrap = true;
+    return shape;
+  }
+  function createResultsTextBox(slide, text) { return createColumn(slide, TEXT_NAME, LEFT_BOX, text); }
+  function createThemesTextBox(slide, text) { return createColumn(slide, THEMES_NAME, RIGHT_BOX, text); }
+
+  function truncate(str, max) {
+    const t = String(str).replace(/\s+/g, ' ').trim();
+    return t.length > max ? `${t.slice(0, max - 1)}…` : t;
+  }
+
+  /**
+   * Builds the two slide columns.
+   *   left  = "What we've received": the raw answers (or the vote counts)
+   *   right = "What it means": the synthesized themes (or the headline stat)
+   */
+  function buildSlideColumns({ question, aggregate, responses, synthesis, participantUrl }) {
+    const count = aggregate ? aggregate.responseCount : 0;
+    const left = [`WHAT WE'VE RECEIVED (${count})`, ''];
+    const right = ['WHAT IT MEANS', ''];
+
+    if (question.type === 'open_text') {
+      const latest = (responses || [])
+        .slice()
+        .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
+        .slice(0, MAX_RAW_LINES);
+      if (latest.length === 0) left.push('No answers yet.');
+      latest.forEach((r) => left.push(`• ${truncate(r.value, 90)}`));
+      if (count > latest.length) left.push(`… and ${count - latest.length} more`);
+
+      const themes = synthesis && synthesis.summaryJson ? synthesis.summaryJson.themes || [] : [];
+      if (!question.showSynthesisOnSlide) {
+        // Instructor has synthesis turned off: leave the column quiet.
+      } else if (themes.length === 0) right.push(count === 0 ? 'Waiting for answers…' : 'Synthesizing…');
+      else themes.slice(0, MAX_THEMES).forEach((t) => right.push(`• ${t}`));
+    } else {
+      const dist = (aggregate && aggregate.distribution) || {};
+      const rows = Object.entries(dist);
+      if (rows.length === 0) left.push('No answers yet.');
+      rows.forEach(([key, stats]) => left.push(`${key}: ${stats.count} (${stats.percentage}%)`));
+      if (aggregate && typeof aggregate.average === 'number') left.push('', `Average: ${aggregate.average.toFixed(2)}`);
+
+      if (count === 0) right.push('Waiting for answers…');
+      else {
+        const top = rows.slice().sort((a, b) => b[1].count - a[1].count)[0];
+        if (top) right.push(`Most common: ${top[0]} (${top[1].percentage}%)`);
+        // The aggregator stores consensus as a label (e.g. high / mixed / low).
+        if (aggregate && typeof aggregate.consensus === 'string' && aggregate.consensus !== 'n/a') {
+          right.push(`Consensus: ${aggregate.consensus}`);
+        }
+      }
+    }
+    return { left: left.join('\n'), right: right.join('\n') };
   }
 
   /** Inserts a base64 PNG on the current slide, preferring the native API when the host has it. */
@@ -498,7 +579,7 @@
       await PowerPoint.run(async (context) => {
         const { shapes } = await loadSlideShapes(context);
         for (const shape of shapes.items) {
-          if (isOurQr(shape) || isOurText(shape)) shape.delete();
+          if (isOurShape(shape)) shape.delete();
         }
         await context.sync();
       });
@@ -538,10 +619,12 @@
   async function handleToggleSynthesis(e) {
     if (!currentQuestion) return;
     try {
-      await apiFetch(`/api/questions/${currentQuestion.id}`, {
+      const { question } = await apiFetch(`/api/questions/${currentQuestion.id}`, {
         method: 'PATCH',
         body: JSON.stringify({ showSynthesisOnSlide: e.target.checked }),
       });
+      currentQuestion = question; // refreshes read this flag; keep it current
+      await handleRefreshSlide({ quiet: true });
     } catch (err) {
       setActionStatus(`Error: ${err.message}`);
     }
@@ -559,27 +642,54 @@
     if (!currentQuestion) return;
     if (!quiet) setActionStatus('Refreshing…');
     try {
-      const [{ aggregate }, synthResult, qrResult] = await Promise.all([
+      const isOpenText = currentQuestion.type === 'open_text';
+      const [{ aggregate }, synthResult, qrResult, responsesResult] = await Promise.all([
         apiFetch(`/api/questions/${currentQuestion.id}/aggregate`),
         currentQuestion.showSynthesisOnSlide
           ? apiFetch(`/api/questions/${currentQuestion.id}/synthesis`)
           : Promise.resolve({ synthesis: null }),
         apiFetch(`/api/questions/${currentQuestion.id}/qrcode`),
+        isOpenText
+          ? apiFetch(`/api/questions/${currentQuestion.id}/responses?limit=${MAX_RAW_LINES * 4}`)
+          : Promise.resolve({ responses: [] }),
       ]);
 
-      const summaryText = buildSlideSummaryText(aggregate, synthResult.synthesis, qrResult.participantUrl);
+      const columns = buildSlideColumns({
+        question: currentQuestion,
+        aggregate,
+        responses: responsesResult.responses,
+        synthesis: synthResult.synthesis,
+        participantUrl: qrResult.participantUrl,
+      });
 
       let note = '';
       await PowerPoint.run(async (context) => {
         const { slide, shapes, notes } = await loadSlideShapes(context);
-        let textShape = shapes.items.find(isOurText);
-        if (textShape) {
-          textShape.textFrame.textRange.text = summaryText;
+        const leftShape = shapes.items.find(isOurText);
+        const rightShape = shapes.items.find(isOurThemes);
+
+        if (leftShape) {
+          leftShape.textFrame.textRange.text = columns.left;
         } else {
-          // The results box is missing (deleted by hand, or lost to an
-          // earlier naming bug). Recreate it rather than silently doing nothing.
-          createResultsTextBox(slide, summaryText);
-          notes.push('results text box was missing and has been recreated');
+          createResultsTextBox(slide, columns.left);
+          notes.push('left column was missing and has been recreated');
+        }
+
+        if (rightShape) {
+          rightShape.textFrame.textRange.text = columns.right;
+        } else {
+          // Either a slide from before the two-column layout, or the box was
+          // deleted by hand. Create the right column and, if the left box is
+          // the old single summary box, move it into the column layout.
+          createThemesTextBox(slide, columns.right);
+          if (leftShape) {
+            leftShape.left = LEFT_BOX.left;
+            leftShape.top = LEFT_BOX.top;
+            leftShape.width = LEFT_BOX.width;
+            leftShape.height = LEFT_BOX.height;
+            leftShape.textFrame.textRange.font.size = 12;
+          }
+          notes.push('slide updated to the two-column layout');
         }
         await context.sync();
         note = notes.length ? ` (${notes.join('; ')})` : '';
@@ -590,20 +700,6 @@
     } catch (err) {
       setActionStatus(`Error: ${err.message}`);
     }
-  }
-
-  function buildSlideSummaryText(aggregate, synthesis, participantUrl) {
-    const lines = [`Scan to answer! ${participantUrl}`, `Responses: ${aggregate ? aggregate.responseCount : 0}`];
-    if (aggregate && aggregate.distribution) {
-      for (const [key, stats] of Object.entries(aggregate.distribution)) {
-        lines.push(`${key}: ${stats.count} (${stats.percentage}%)`);
-      }
-    }
-    if (synthesis && synthesis.summaryJson) {
-      lines.push('', 'Top themes:');
-      (synthesis.summaryJson.themes || []).slice(0, 3).forEach((t) => lines.push(`- ${t}`));
-    }
-    return lines.join('\n');
   }
 
   function escapeHtml(str) {
